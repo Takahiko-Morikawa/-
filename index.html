@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ライトテトリス - Ver 1.0.4</title>
+    <title>ライトテトリス - Ver 1.0.5</title>
     <style>
         body {
             background-color: #000;
@@ -57,7 +57,7 @@
         .side-panel h2 { font-size: 14px; margin: 0; }
         .side-panel p { font-size: 20px; margin: 0 0 20px 0; }
 
-        /* NUKO画像ボックス */
+        /* NUKO画像ボックス（青枠） */
         .nuko-box {
             width: 80px;
             height: 80px;
@@ -131,7 +131,7 @@
         </div>
 
         <div class="side-panel">
-            <div class="version">Ver 1.0.4</div>
+            <div class="version">Ver 1.0.5</div>
             <h2>SCORE</h2>
             <p id="score">0</p>
             <h2>NEXT</h2>
@@ -197,173 +197,4 @@
         function collision() {
             return currentPiece.shape.some((row, dy) => {
                 return row.some((value, dx) => {
-                    let newX = currentPiece.x + dx;
-                    let newY = currentPiece.y + dy;
-                    return value && (newX < 0 || newX >= COLS || newY >= ROWS || (newY >= 0 && board[newY][newX]));
-                });
-            });
-        }
-
-        function freeze() {
-            currentPiece.shape.forEach((row, dy) => {
-                row.forEach((value, dx) => {
-                    if (value) board[currentPiece.y + dy][currentPiece.x + dx] = currentPiece.color;
-                });
-            });
-            checkAndAnimateLines();
-        }
-
-        function checkAndAnimateLines() {
-            clearingRows = [];
-            for (let y = 0; y < ROWS; y++) {
-                if (board[y].every(cell => cell !== 0)) {
-                    clearingRows.push(y);
-                }
-            }
-
-            if (clearingRows.length > 0) {
-                isAnimating = true;
-                seClear.currentTime = 0; 
-                seClear.play();
-
-                setTimeout(() => {
-                    seClear.pause();
-                    seClear.currentTime = 0;
-                    clearLinesActual();
-                    isAnimating = false;
-                    createPiece();
-                }, 500);
-            } else {
-                createPiece();
-            }
-        }
-
-        function clearLinesActual() {
-            let linesCleared = clearingRows.length;
-            clearingRows.sort((a, b) => a - b).forEach(y => {
-                board.splice(y, 1);
-                board.unshift(Array(COLS).fill(0));
-            });
-            
-            const points = [0, 100, 300, 500, 800];
-            score += points[linesCleared];
-            scoreDisp.innerText = score;
-            
-            if (linesCleared === 4) {
-                nukoSideBox.style.display = 'flex';
-                setTimeout(() => { nukoSideBox.style.display = 'none'; }, 2000);
-            }
-            clearingRows = [];
-        }
-
-        function moveDown() {
-            if (isAnimating) return;
-            currentPiece.y++;
-            if (collision()) {
-                currentPiece.y--;
-                freeze();
-            }
-            dropCounter = 0;
-        }
-
-        function rotatePiece() {
-            if (!gameActive || isAnimating) return;
-            const original = currentPiece.shape;
-            currentPiece.shape = currentPiece.shape[0].map((_, i) => currentPiece.shape.map(row => row[i]).reverse());
-            if (collision()) currentPiece.shape = original;
-            draw();
-        }
-
-        function moveLeft() { if (!gameActive || isAnimating) return; currentPiece.x--; if(collision()) currentPiece.x++; draw(); }
-        function moveRight() { if (!gameActive || isAnimating) return; currentPiece.x++; if(collision()) currentPiece.x--; draw(); }
-        function moveDownManual() { if (!gameActive || isAnimating) return; moveDown(); draw(); }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            sparkleFrame++;
-
-            board.forEach((row, y) => {
-                row.forEach((cell, x) => {
-                    if (cell) {
-                        if (clearingRows.includes(y)) {
-                            ctx.fillStyle = (Math.floor(sparkleFrame / 5) % 2 === 0) ? '#fff' : '#00ffff';
-                        } else {
-                            ctx.fillStyle = cell;
-                        }
-                        ctx.fillRect(x * SIZE, y * SIZE, SIZE - 1, SIZE - 1);
-                    }
-                });
-            });
-
-            if (currentPiece && !isAnimating) {
-                ctx.fillStyle = currentPiece.color;
-                currentPiece.shape.forEach((row, dy) => {
-                    row.forEach((value, dx) => {
-                        if (value) ctx.fillRect((currentPiece.x + dx) * SIZE, (currentPiece.y + dy) * SIZE, SIZE - 1, SIZE - 1);
-                    });
-                });
-            }
-        }
-
-        function drawNext() {
-            nextCtx.clearRect(0, 0, 60, 60);
-            nextCtx.fillStyle = '#00ffff';
-            nextPiece.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value) nextCtx.fillRect(x * 15 + 10, y * 15 + 10, 14, 14);
-                });
-            });
-        }
-
-        function update(time = 0) {
-            if (!gameActive) return;
-            const deltaTime = time - lastTime;
-            lastTime = time;
-            if (!isAnimating) {
-                dropCounter += deltaTime;
-                if (dropCounter > 1000) moveDown();
-            }
-            draw();
-            requestAnimationFrame(update);
-        }
-
-        function gameOver() {
-            gameActive = false;
-            isGameOver = true;
-            bgm.pause();
-            gameTitleDisp.innerText = 'GAME OVER';
-            startButtonUi.innerText = 'RETRY';
-            startOverlay.style.display = 'flex';
-        }
-
-        function onOverlayClick() {
-            if (isGameOver) {
-                isGameOver = false;
-                startGame();
-            } else {
-                startGame();
-            }
-        }
-
-        function startGame() {
-            board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-            score = 0;
-            scoreDisp.innerText = score;
-            gameActive = true;
-            isGameOver = false;
-            isAnimating = false;
-            startOverlay.style.display = 'none';
-            gameTitleDisp.innerText = 'テトリス';
-            startButtonUi.innerText = 'START';
-            
-            // BGM音量を半分（0.5）に設定
-            bgm.volume = 0.5;
-            bgm.currentTime = 0;
-            bgm.play().catch(e => {});
-
-            createPiece();
-            update();
-        }
-    </script>
-</body>
-</html>
+                    let newX = currentPiece.

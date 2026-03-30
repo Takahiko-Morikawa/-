@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ライトテトリス - 演出強化版</title>
+    <title>ライトテトリス - 演出修正版</title>
     <style>
         body {
             background-color: #000;
@@ -42,6 +42,7 @@
             width: 80px;
         }
 
+        /* 【緑枠】バージョン表記：右上 */
         .version {
             position: absolute;
             top: 5px;
@@ -54,6 +55,7 @@
         .side-panel h2 { font-size: 14px; margin: 0; }
         .side-panel p { font-size: 20px; margin: 0 0 20px 0; }
 
+        /* 【青枠】NUKO画像表示ボックス */
         .nuko-box {
             width: 80px;
             height: 80px;
@@ -108,13 +110,6 @@
             touch-action: manipulation; 
             -webkit-tap-highlight-color: transparent;
         }
-
-        /* キラキラ点滅アニメーション */
-        @keyframes sparkle {
-            0% { background-color: #fff; opacity: 1; }
-            50% { background-color: #00ffff; opacity: 0.5; }
-            100% { background-color: #fff; opacity: 1; }
-        }
     </style>
 </head>
 <body>
@@ -139,6 +134,7 @@
             <p id="score">0</p>
             <h2>NEXT</h2>
             <canvas id="next-canvas" width="60" height="60" style="border:1px solid #444; margin-left:auto;"></canvas>
+            
             <div id="nuko-side-box" class="nuko-box">
                 <img src="NUKO.png" id="nuko-side-image" alt="NUKO">
             </div>
@@ -163,7 +159,6 @@
         const gameTitleDisp = document.getElementById('game-title');
         const startButtonUi = document.getElementById('start-button-ui');
         
-        // 音声の取得
         const bgm = document.getElementById('bgm');
         const seClear = document.getElementById('se-clear');
 
@@ -175,13 +170,13 @@
         let score = 0;
         let gameActive = false;
         let isGameOver = false;
-        let isAnimating = false; // アニメーション中フラグ
-        let clearingRows = [];   // 消える予定の行
+        let isAnimating = false;
+        let clearingRows = [];
         let currentPiece = null;
         let nextPiece = null;
         let dropCounter = 0;
         let lastTime = 0;
-        let sparkleFrame = 0;   // 点滅用フレーム
+        let sparkleFrame = 0;
 
         const PIECES = [
             [[1, 1, 1, 1]], [[1, 1], [1, 1]], [[0, 1, 0], [1, 1, 1]],
@@ -216,7 +211,7 @@
             checkAndAnimateLines();
         }
 
-        // ライン消去とアニメーションの制御
+        // --- 効果音の制御を強化 ---
         function checkAndAnimateLines() {
             clearingRows = [];
             for (let y = 0; y < ROWS; y++) {
@@ -226,12 +221,17 @@
             }
 
             if (clearingRows.length > 0) {
-                isAnimating = true; // 操作を一時停止
-                seClear.currentTime = 0;
-                seClear.play(); // 効果音再生
+                isAnimating = true;
+                
+                // 【効果音】再生開始
+                seClear.currentTime = 0; 
+                seClear.play();
 
-                // 500ms後に実際にラインを消す
+                // 500ms（点滅中）だけ音を鳴らし、終わったら止める
                 setTimeout(() => {
+                    seClear.pause(); // 1回再生されたら止める
+                    seClear.currentTime = 0;
+                    
                     clearLinesActual();
                     isAnimating = false;
                     createPiece();
@@ -252,6 +252,7 @@
             score += points[linesCleared];
             scoreDisp.innerText = score;
             
+            // 4行消しでNUKO表示（青枠）
             if (linesCleared === 4) {
                 nukoSideBox.style.display = 'flex';
                 setTimeout(() => { nukoSideBox.style.display = 'none'; }, 2000);
@@ -288,7 +289,7 @@
             board.forEach((row, y) => {
                 row.forEach((cell, x) => {
                     if (cell) {
-                        // 消える行のキラキラ点滅
+                        // キラキラ点滅の描画
                         if (clearingRows.includes(y)) {
                             ctx.fillStyle = (Math.floor(sparkleFrame / 5) % 2 === 0) ? '#fff' : '#00ffff';
                         } else {
@@ -336,7 +337,7 @@
         function gameOver() {
             gameActive = false;
             isGameOver = true;
-            bgm.pause(); // BGM停止
+            bgm.pause(); // BGM停止（仕様維持）
             gameTitleDisp.innerText = 'GAME OVER';
             startButtonUi.innerText = 'RETRY';
             startOverlay.style.display = 'flex';
@@ -362,9 +363,8 @@
             gameTitleDisp.innerText = 'テトリス';
             startButtonUi.innerText = 'START';
             
-            // 音声再生（ブラウザ制限のため、ここで再生開始）
             bgm.currentTime = 0;
-            bgm.play().catch(e => console.log("BGM再生に失敗しました（音声ファイルがない可能性があります）"));
+            bgm.play().catch(e => {});
 
             createPiece();
             update();

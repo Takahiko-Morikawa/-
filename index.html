@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ライトテトリス - 修正版</title>
+    <title>ライトテトリス - 演出強化版</title>
     <style>
         body {
             background-color: #000;
@@ -14,7 +14,6 @@
             align-items: center;
             margin: 0;
             padding-top: 20px;
-            /* スマホで画面が動かないように固定 */
             overflow: hidden;
             position: fixed;
             width: 100%;
@@ -29,7 +28,6 @@
             background-color: #000;
         }
 
-        /* 左側ゲーム画面 */
         #game-container {
             position: relative;
             width: 200px;
@@ -38,18 +36,12 @@
             background-color: #000;
         }
 
-        canvas {
-            display: block;
-        }
-
-        /* 右側パネル */
         .side-panel {
             text-align: right;
             color: #00ffff;
             width: 80px;
         }
 
-        /* 【緑枠の箇所】バージョン表記：右上に移動 */
         .version {
             position: absolute;
             top: 5px;
@@ -62,26 +54,20 @@
         .side-panel h2 { font-size: 14px; margin: 0; }
         .side-panel p { font-size: 20px; margin: 0 0 20px 0; }
 
-        /* 【青枠の箇所】NUKO画像表示ボックス */
         .nuko-box {
             width: 80px;
             height: 80px;
             border: 2px solid #00ffff;
             margin-top: 20px;
-            display: none; /* 初期は非表示 */
+            display: none;
             justify-content: center;
             align-items: center;
             background-color: #000;
             margin-left: auto;
         }
         
-        #nuko-side-image {
-            max-width: 100%;
-            max-height: 100%;
-            display: block;
-        }
+        #nuko-side-image { max-width: 100%; max-height: 100%; display: block; }
 
-        /* STARTボタン画面 */
         #start-overlay {
             position: absolute;
             top: 0; left: 0; 
@@ -101,10 +87,8 @@
             color: #00ffff;
             font-weight: bold;
             background: #000;
-            pointer-events: none;
         }
 
-        /* 操作ボタン（スマホ連打ズーム防止） */
         .controls {
             margin-top: 20px;
             display: grid;
@@ -121,33 +105,42 @@
             border-radius: 10px;
             font-size: 28px;
             cursor: pointer;
-            /* 連続タップでのズームを防止 */
             touch-action: manipulation; 
             -webkit-tap-highlight-color: transparent;
+        }
+
+        /* キラキラ点滅アニメーション */
+        @keyframes sparkle {
+            0% { background-color: #fff; opacity: 1; }
+            50% { background-color: #00ffff; opacity: 0.5; }
+            100% { background-color: #fff; opacity: 1; }
         }
     </style>
 </head>
 <body>
 
+    <audio id="bgm" src="bgm.mp3" loop></audio>
+    <audio id="se-clear" src="clear.mp3"></audio>
+
     <div class="game-wrapper">
         <div id="game-container">
             <canvas id="game-canvas" width="200" height="400"></canvas>
             
-            <div id="start-overlay" onclick="startGame()">
-                <div style="color:#00ffff; margin-bottom:10px; pointer-events:none;">ライト社</div>
-                <div style="font-size:24px; margin-bottom:20px; pointer-events:none;">テトリス</div>
+            <div id="start-overlay" onclick="onOverlayClick()">
+                <div style="color:#00ffff; margin-bottom:10px;">ライト社</div>
+                <div id="game-title" style="font-size:24px; margin-bottom:20px;">テトリス</div>
                 <div id="start-button-ui">START</div>
             </div>
         </div>
 
         <div class="side-panel">
-            <div class="version">Ver 1.0.2</div>
+            <div class="version">Ver 1.0.3</div>
             <h2>SCORE</h2>
             <p id="score">0</p>
             <h2>NEXT</h2>
             <canvas id="next-canvas" width="60" height="60" style="border:1px solid #444; margin-left:auto;"></canvas>
             <div id="nuko-side-box" class="nuko-box">
-                <img src="NUKO.png" id="nuko-side-image" alt="NUKO image">
+                <img src="NUKO.png" id="nuko-side-image" alt="NUKO">
             </div>
         </div>
     </div>
@@ -165,8 +158,14 @@
         const nextCanvas = document.getElementById('next-canvas');
         const nextCtx = nextCanvas.getContext('2d');
         const scoreDisp = document.getElementById('score');
-        const nukoSideBox = document.getElementById('nuko-side-box'); // 取得：青枠ボックス
+        const nukoSideBox = document.getElementById('nuko-side-box');
         const startOverlay = document.getElementById('start-overlay');
+        const gameTitleDisp = document.getElementById('game-title');
+        const startButtonUi = document.getElementById('start-button-ui');
+        
+        // 音声の取得
+        const bgm = document.getElementById('bgm');
+        const seClear = document.getElementById('se-clear');
 
         const ROWS = 20;
         const COLS = 10;
@@ -175,35 +174,27 @@
         let board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
         let score = 0;
         let gameActive = false;
+        let isGameOver = false;
+        let isAnimating = false; // アニメーション中フラグ
+        let clearingRows = [];   // 消える予定の行
         let currentPiece = null;
         let nextPiece = null;
         let dropCounter = 0;
         let lastTime = 0;
+        let sparkleFrame = 0;   // 点滅用フレーム
 
         const PIECES = [
-            [[1, 1, 1, 1]], // I
-            [[1, 1], [1, 1]], // O
-            [[0, 1, 0], [1, 1, 1]], // T
-            [[1, 1, 0], [0, 1, 1]], // S
-            [[0, 1, 1], [1, 1, 0]], // Z
-            [[1, 0, 0], [1, 1, 1]], // J
-            [[0, 0, 1], [1, 1, 1]]  // L
+            [[1, 1, 1, 1]], [[1, 1], [1, 1]], [[0, 1, 0], [1, 1, 1]],
+            [[1, 1, 0], [0, 1, 1]], [[0, 1, 1], [1, 1, 0]],
+            [[1, 0, 0], [1, 1, 1]], [[0, 0, 1], [1, 1, 1]]
         ];
 
         function createPiece() {
             if (!nextPiece) nextPiece = PIECES[Math.floor(Math.random() * PIECES.length)];
-            currentPiece = {
-                shape: nextPiece,
-                x: 3,
-                y: 0,
-                color: '#00ffff'
-            };
+            currentPiece = { shape: nextPiece, x: 3, y: 0, color: '#00ffff' };
             nextPiece = PIECES[Math.floor(Math.random() * PIECES.length)];
             drawNext();
-            if (collision()) {
-                gameActive = false;
-                startOverlay.style.display = 'flex';
-            }
+            if (collision()) gameOver();
         }
 
         function collision() {
@@ -222,34 +213,54 @@
                     if (value) board[currentPiece.y + dy][currentPiece.x + dx] = currentPiece.color;
                 });
             });
-            clearLines();
-            createPiece();
+            checkAndAnimateLines();
         }
 
-        function clearLines() {
-            let linesCleared = 0;
-            for (let y = ROWS - 1; y >= 0; y--) {
+        // ライン消去とアニメーションの制御
+        function checkAndAnimateLines() {
+            clearingRows = [];
+            for (let y = 0; y < ROWS; y++) {
                 if (board[y].every(cell => cell !== 0)) {
-                    board.splice(y, 1);
-                    board.unshift(Array(COLS).fill(0));
-                    linesCleared++;
-                    y++;
+                    clearingRows.push(y);
                 }
             }
-            if (linesCleared > 0) {
-                const points = [0, 100, 300, 500, 800];
-                score += points[linesCleared];
-                scoreDisp.innerText = score;
-                
-                // 【追加仕様】4行消去（テトリス）時に青枠の中にNUKOを表示
-                if (linesCleared === 4) {
-                    nukoSideBox.style.display = 'flex'; // 青枠ボックスを表示
-                    setTimeout(() => { nukoSideBox.style.display = 'none'; }, 2000);
-                }
+
+            if (clearingRows.length > 0) {
+                isAnimating = true; // 操作を一時停止
+                seClear.currentTime = 0;
+                seClear.play(); // 効果音再生
+
+                // 500ms後に実際にラインを消す
+                setTimeout(() => {
+                    clearLinesActual();
+                    isAnimating = false;
+                    createPiece();
+                }, 500);
+            } else {
+                createPiece();
             }
+        }
+
+        function clearLinesActual() {
+            let linesCleared = clearingRows.length;
+            clearingRows.sort((a, b) => a - b).forEach(y => {
+                board.splice(y, 1);
+                board.unshift(Array(COLS).fill(0));
+            });
+            
+            const points = [0, 100, 300, 500, 800];
+            score += points[linesCleared];
+            scoreDisp.innerText = score;
+            
+            if (linesCleared === 4) {
+                nukoSideBox.style.display = 'flex';
+                setTimeout(() => { nukoSideBox.style.display = 'none'; }, 2000);
+            }
+            clearingRows = [];
         }
 
         function moveDown() {
+            if (isAnimating) return;
             currentPiece.y++;
             if (collision()) {
                 currentPiece.y--;
@@ -259,28 +270,36 @@
         }
 
         function rotatePiece() {
-            if (!gameActive) return;
+            if (!gameActive || isAnimating) return;
             const original = currentPiece.shape;
             currentPiece.shape = currentPiece.shape[0].map((_, i) => currentPiece.shape.map(row => row[i]).reverse());
             if (collision()) currentPiece.shape = original;
             draw();
         }
 
-        function moveLeft() { if (!gameActive) return; currentPiece.x--; if(collision()) currentPiece.x++; draw(); }
-        function moveRight() { if (!gameActive) return; currentPiece.x++; if(collision()) currentPiece.x--; draw(); }
-        function moveDownManual() { if (!gameActive) return; moveDown(); draw(); }
+        function moveLeft() { if (!gameActive || isAnimating) return; currentPiece.x--; if(collision()) currentPiece.x++; draw(); }
+        function moveRight() { if (!gameActive || isAnimating) return; currentPiece.x++; if(collision()) currentPiece.x--; draw(); }
+        function moveDownManual() { if (!gameActive || isAnimating) return; moveDown(); draw(); }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            sparkleFrame++;
+
             board.forEach((row, y) => {
                 row.forEach((cell, x) => {
                     if (cell) {
-                        ctx.fillStyle = cell;
+                        // 消える行のキラキラ点滅
+                        if (clearingRows.includes(y)) {
+                            ctx.fillStyle = (Math.floor(sparkleFrame / 5) % 2 === 0) ? '#fff' : '#00ffff';
+                        } else {
+                            ctx.fillStyle = cell;
+                        }
                         ctx.fillRect(x * SIZE, y * SIZE, SIZE - 1, SIZE - 1);
                     }
                 });
             });
-            if (currentPiece) {
+
+            if (currentPiece && !isAnimating) {
                 ctx.fillStyle = currentPiece.color;
                 currentPiece.shape.forEach((row, dy) => {
                     row.forEach((value, dx) => {
@@ -304,21 +323,49 @@
             if (!gameActive) return;
             const deltaTime = time - lastTime;
             lastTime = time;
-            dropCounter += deltaTime;
-            if (dropCounter > 1000) {
-                moveDown();
+            
+            if (!isAnimating) {
+                dropCounter += deltaTime;
+                if (dropCounter > 1000) moveDown();
             }
+            
             draw();
             requestAnimationFrame(update);
         }
 
-        // STARTボタンを押した時の関数
+        function gameOver() {
+            gameActive = false;
+            isGameOver = true;
+            bgm.pause(); // BGM停止
+            gameTitleDisp.innerText = 'GAME OVER';
+            startButtonUi.innerText = 'RETRY';
+            startOverlay.style.display = 'flex';
+        }
+
+        function onOverlayClick() {
+            if (isGameOver) {
+                isGameOver = false;
+                startGame();
+            } else {
+                startGame();
+            }
+        }
+
         function startGame() {
             board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
             score = 0;
             scoreDisp.innerText = score;
             gameActive = true;
+            isGameOver = false;
+            isAnimating = false;
             startOverlay.style.display = 'none';
+            gameTitleDisp.innerText = 'テトリス';
+            startButtonUi.innerText = 'START';
+            
+            // 音声再生（ブラウザ制限のため、ここで再生開始）
+            bgm.currentTime = 0;
+            bgm.play().catch(e => console.log("BGM再生に失敗しました（音声ファイルがない可能性があります）"));
+
             createPiece();
             update();
         }

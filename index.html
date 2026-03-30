@@ -3,200 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ライトテトリス - 修正版</title>
+    <title>ライトテトリス</title>
     <style>
-        /* --- 元のレイアウトを再現するCSS --- */
+        /* --- レイアウトの復元と修正 --- */
         body {
             background-color: #000;
             color: #fff;
-            font-family: sans-serif;
-            /* 中央配置ではなく、上部から配置 */
+            font-family: 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
-            align-items: center; /* 横方向の中央配置は維持 */
+            align-items: center;
             margin: 0;
             padding-top: 20px;
-            touch-action: none; /* 画面全体の不要な挙動を制限 */
+            touch-action: none;
         }
 
-        /* ゲーム画面全体のコンテナ */
-        .main-game-area {
-            width: 300px; /* 元のスクリーンショットから推測 */
-            margin: 0 auto;
-        }
-
-        /* キャラクター（NUKO）の配置 */
-        .character-nuko {
-            display: block;
-            width: 80px; /* 元の画像サイズから推測 */
-            height: auto;
-            margin: 0 auto 10px auto; /* 中央配置、下マージン */
-        }
-
-        /* ゲーム枠とスコアエリアを並べるコンテナ */
-        .game-board-and-score {
+        .game-wrapper {
+            position: relative;
+            border: 1px solid #444;
+            padding: 20px;
             display: flex;
-            flex-direction: row;
-            justify-content: space-between;
-            width: 100%;
-            border: 2px solid #333; /* 元のスクリーンショットの外枠 */
-            padding: 10px;
-            box-sizing: border-box;
+            gap: 20px;
         }
 
-        /* ゲーム枠（左側） */
-        .game-canvas-area {
+        /* 赤枠の箇所：バージョン表記 */
+        .version {
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            color: #00ffff;
+            font-size: 12px;
+        }
+
+        /* 緑枠の箇所：ゲーム画面 */
+        #game-container {
+            position: relative;
             width: 200px;
             height: 400px;
-            border: 1px solid #fff;
-            box-sizing: border-box;
+            border: 2px solid #fff;
+            background-color: #000;
+        }
+
+        #game-canvas {
+            display: block;
+        }
+
+        /* 4行消去時に出るNUKO画像 */
+        #nuko-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120px;
+            display: none; /* 通常は非表示 */
+            z-index: 10;
+        }
+
+        /* 右側：スコアと次 */
+        .side-panel {
+            text-align: right;
+            color: #00ffff;
+            width: 80px;
+        }
+
+        .side-panel h2 { font-size: 14px; margin: 0; }
+        .side-panel p { font-size: 20px; margin: 0 0 20px 0; }
+
+        .next-box {
+            width: 60px;
+            height: 60px;
+            border: 1px solid #444;
+            margin-left: auto;
+        }
+
+        /* STARTボタンのレイアウト修正 */
+        #start-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            position: relative;
+            z-index: 20;
         }
 
-        /* ゲームキャンバス（JavaScriptで描画される部分） */
-        #game-canvas {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* STARTボタン（JavaScriptで制御される） */
         #start-button {
-            position: absolute;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px;
             border: 2px solid #00ffff;
-            border-radius: 5px;
-            color: #fff;
-            text-align: center;
+            padding: 10px 20px;
+            color: #00ffff;
             cursor: pointer;
+            font-weight: bold;
         }
 
-        #start-button h1 {
-            margin: 0;
-            font-size: 20px;
-            color: #00ffff;
-        }
-
-        #start-button p {
-            margin: 5px 0 0 0;
-            font-size: 14px;
-            color: #fff;
-        }
-
-        /* スコアエリア（右側） */
-        .score-area {
-            width: 80px;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: flex-end;
-            color: #00ffff;
-        }
-
-        .score-area h2 {
-            margin: 0;
-            font-size: 14px;
-        }
-
-        .score-area p {
-            margin: 0;
-            font-size: 24px;
-        }
-
-        .score-area .next-block {
-            width: 60px;
-            height: 60px;
-            border: 2px solid #333;
-            margin-top: 10px;
-            box-sizing: border-box;
-        }
-
-        /* 【修正2】Ver表記をPC・スマホ両方で常に出す */
-        .version-info {
-            font-size: 10px;
-            opacity: 0.7;
-            margin-top: 10px;
-            display: block; /* 常に表示 */
-        }
-
-        /* 操作ボタンのコンテナ（下部） */
+        /* 操作ボタン（連打対策済み） */
         .controls {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             margin-top: 20px;
-        }
-
-        .control-row {
-            display: flex;
-            flex-direction: row;
+            display: grid;
+            grid-template-areas: ". up ." "left down right";
             gap: 10px;
         }
 
         .btn {
-            width: 50px;
-            height: 50px;
+            width: 60px;
+            height: 60px;
             border: 2px solid #00ffff;
             background: none;
             color: #00ffff;
-            border-radius: 5px;
-            font-size: 20px;
-            cursor: pointer;
-            /* 【修正1】連続タップによるズームを無効化 */
-            touch-action: manipulation; 
-            /* タップした時の青い枠線を消す（スマホ用） */
+            border-radius: 10px;
+            font-size: 24px;
+            touch-action: manipulation; /* 連打ズーム防止 */
             -webkit-tap-highlight-color: transparent;
-        }
-
-        .btn.up {
-            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
 
-    <img src="NUKO.png" alt="NUKO" class="character-nuko">
+    <div class="game-wrapper">
+        <div class="version">Ver 1.0.2</div>
 
-    <div class="main-game-area">
-        <div class="game-board-and-score">
-            <div class="game-canvas-area">
-                <canvas id="game-canvas"></canvas>
-                <div id="start-button">
-                    <h1>テトリス</h1>
-                    <p>START</p>
-                </div>
-            </div>
+        <div id="game-container">
+            <canvas id="game-canvas" width="200" height="400"></canvas>
+            
+            <img src="NUKO.png" id="nuko-overlay" alt="NUKO">
 
-            <div class="score-area">
-                <h2>SCORE</h2>
-                <p>0</p>
-                <h2>NEXT</h2>
-                <div class="next-block"></div>
-                <div class="version-info">Ver 1.0.2</div>
+            <div id="start-overlay">
+                <div style="color:#00ffff; margin-bottom:10px;">ライト社</div>
+                <div style="font-size:24px; margin-bottom:20px;">テトリス</div>
+                <div id="start-button">START</div>
             </div>
         </div>
 
-        <div class="controls">
-            <button class="btn up">↻</button>
-            <div class="control-row">
-                <button class="btn left">←</button>
-                <button class="btn down">↓</button>
-                <button class="btn right">→</button>
-            </div>
+        <div class="side-panel">
+            <h2>SCORE</h2>
+            <p id="score">0</p>
+            <h2>NEXT</h2>
+            <div class="next-box" id="next-box"></div>
         </div>
     </div>
 
+    <div class="controls">
+        <button class="btn" style="grid-area: up;" id="rotate">↻</button>
+        <button class="btn" style="grid-area: left;" id="left">←</button>
+        <button class="btn" style="grid-area: down;" id="down">↓</button>
+        <button class="btn" style="grid-area: right;" id="right">→</button>
+    </div>
+
     <script>
-        // これはプレースホルダーです。ご自身の元のコードと差し替えてください。
-        // （例）const startButton = document.getElementById('start-button');
-        // （例）startButton.addEventListener('click', ... );
+        // --- ゲームプログラム (STARTボタン修正 & NUKO演出追加) ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('start-button');
+        const startOverlay = document.getElementById('start-overlay');
+        const nukoImg = document.getElementById('nuko-overlay');
+        const scoreElement = document.getElementById('score');
+
+        let score = 0;
+        let gameInterval;
+
+        // STARTボタンを押した時の処理
+        startBtn.addEventListener('click', () => {
+            startOverlay.style.display = 'none';
+            resetGame();
+        });
+
+        function resetGame() {
+            score = 0;
+            scoreElement.innerText = score;
+            // ここに本来のテトリス開始ロジックが入ります
+            startGameLoop();
+        }
+
+        function startGameLoop() {
+            if (gameInterval) clearInterval(gameInterval);
+            gameInterval = setInterval(() => {
+                // 仮のゲーム進行ロジック
+                draw();
+            }, 1000);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00ffff';
+            ctx.fillRect(20, 20, 20, 20); // 仮のブロック
+        }
+
+        // 4行消した時のNUKO表示ロジック (関数として定義)
+        function checkTetris(rowsCleared) {
+            if (rowsCleared === 4) {
+                // 4行消し成功！
+                nukoImg.style.display = 'block'; // NUKOを表示
+                setTimeout(() => {
+                    nukoImg.style.display = 'none'; // 2秒後に隠す
+                }, 2000);
+            }
+        }
+
+        // テスト用：スコア加算時に4行消去をシミュレートする場合
+        // checkTetris(4); 
     </script>
 </body>
 </html>

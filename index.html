@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ライト社 テトリス v1.1</title>
+    <title>ライト社 テトリス v1.2</title>
     <style>
-        /* スマホ向けに全体をさらにコンパクトに */
         * { box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
         body { 
             background: #000; color: #fff; font-family: sans-serif; 
@@ -16,9 +15,10 @@
         #mosaic-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: repeat(15, 1fr); opacity: 0.1; z-index: -2; pointer-events: none; }
         .tile { border: 0.5px solid rgba(0,255,255,0.05); }
 
-        /* ドラえもん：さらに左へ（被り解消） */
-        #dora-wrap { position: fixed; top: 15%; left: -20px; z-index: -1; opacity: 0; transition: opacity 0.5s; }
-        #dora-canvas { width: 110px; height: 110px; image-rendering: pixelated; }
+        /* バージョン常時表示（画面右上） */
+        .persistent-version {
+            position: fixed; top: 10px; right: 10px; color: #555; font-size: 12px; font-weight: bold; z-index: 300;
+        }
 
         #wrapper { 
             display: flex; gap: 8px; z-index: 10; padding: 10px; 
@@ -28,11 +28,18 @@
         #game-container { position: relative; border: 2px solid #555; width: 180px; height: 360px; background: #000; }
         canvas#tetris { display: block; width: 100%; height: 100%; }
         
-        #ui { width: 60px; display: flex; flex-direction: column; gap: 10px; font-size: 9px; }
-        .brand { color: #0ff; font-weight: bold; }
-        .score { font-size: 18px; font-weight: bold; color: #0ff; }
+        #ui { width: 70px; display: flex; flex-direction: column; gap: 10px; }
+        .label { color: #0ff; font-weight: bold; font-size: 10px; letter-spacing: 1px; }
+        .score { font-size: 20px; font-weight: bold; color: #0ff; margin-bottom: 5px; }
 
-        /* コントローラー：2重反応防止設定 */
+        /* ドラえもん配置場所：UIパネル内（NEXTの下） */
+        #dora-wrap { 
+            width: 60px; height: 60px; margin-top: 10px;
+            opacity: 0; transition: opacity 0.5s; 
+        }
+        #dora-canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+
+        /* コントローラー */
         #controls {
             display: grid; grid-template-columns: repeat(3, 65px); grid-template-rows: repeat(2, 65px);
             gap: 12px; margin-top: 15px; z-index: 100;
@@ -41,7 +48,7 @@
             width: 65px; height: 65px; background: rgba(0, 255, 255, 0.1);
             border: 2px solid #0ff; color: #0ff; border-radius: 12px;
             font-size: 24px; display: flex; align-items: center; justify-content: center;
-            user-select: none; pointer-events: auto;
+            user-select: none;
         }
         .btn-ctrl:active { background: #0ff; color: #000; }
 
@@ -54,14 +61,13 @@
             padding: 15px 40px; font-size: 20px; color: #0ff; border: 2px solid #0ff; 
             background: transparent; font-weight: bold; cursor: pointer;
         }
-        /* バージョン表示 */
-        .version { position: absolute; bottom: 10px; right: 10px; color: #444; font-size: 10px; }
     </style>
 </head>
 <body>
 
+<div class="persistent-version">Ver 1.2</div>
+
 <div id="mosaic-bg"></div>
-<div id="dora-wrap"><canvas id="dora-canvas" width="100" height="100"></canvas></div>
 
 <div id="wrapper">
     <div id="game-container">
@@ -71,7 +77,6 @@
             <div style="color:#0ff; font-size:10px; margin-bottom:5px;">ライト社</div>
             <h1 style="margin:0 0 25px 0; font-size: 26px;">テトリス</h1>
             <div id="start-btn-trigger" class="btn-start">START</div>
-            <div class="version">v1.1</div>
         </div>
 
         <div id="go-screen" class="overlay" style="display:none;">
@@ -79,10 +84,19 @@
             <div id="retry-btn-trigger" class="btn-start">RETRY</div>
         </div>
     </div>
+
     <div id="ui">
-        <div class="brand">ライト社</div>
+        <div class="label">SCORE</div>
         <div id="score-val" class="score">0</div>
-        <div style="width:40px; height:40px; background:#111;"><canvas id="next" width="40" height="40"></canvas></div>
+        
+        <div class="label">NEXT</div>
+        <div style="width:50px; height:50px; background:#111; border:1px solid #333;">
+            <canvas id="next" width="50" height="50"></canvas>
+        </div>
+
+        <div id="dora-wrap">
+            <canvas id="dora-canvas" width="100" height="100"></canvas>
+        </div>
     </div>
 </div>
 
@@ -98,7 +112,7 @@
     const nCtx = nCanvas.getContext('2d');
     const grid = 20;
     ctx.scale(grid, grid);
-    nCtx.scale(8, 8);
+    nCtx.scale(10, 10);
 
     const colors = [null, '#0ff', '#00f', '#f70', '#ff0', '#0f0', '#a0f', '#f00'];
     let arena = Array.from({length: 20}, () => Array(10).fill(0));
@@ -150,7 +164,7 @@
     function draw() {
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         drawM(arena, {x:0, y:0}, ctx); drawM(player.matrix, player.pos, ctx);
-        nCtx.fillStyle = '#111'; nCtx.fillRect(0,0,40,40);
+        nCtx.fillStyle = '#111'; nCtx.fillRect(0,0,50,50);
         if(player.next) drawM(player.next, {x:1, y:1}, nCtx);
     }
 
@@ -179,7 +193,7 @@
             player.score += r === 4 ? 150 : r * 10;
             document.getElementById('score-val').innerText = player.score;
             if(r === 4) {
-                const d = document.getElementById('dora-wrap'); d.style.opacity = '0.7';
+                const d = document.getElementById('dora-wrap'); d.style.opacity = '1';
                 setTimeout(() => d.style.opacity = '0', 3000);
             }
         }
@@ -213,7 +227,6 @@
         draw(); requestAnimationFrame(update);
     }
 
-    // 起動スイッチの修正 (v1.1)
     function gameStart() {
         if(!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -227,22 +240,14 @@
         initMosaic(); drawDora(); isPaused = false; resetPlayer();
     }
 
-    // イベント一括設定：2重反応を物理的に殺す
     const handleAction = (actionFn, e) => {
-        if (e) {
-            e.preventDefault(); // これが2重反応を止める魔法
-            e.stopPropagation();
-        }
+        if (e) { e.preventDefault(); e.stopPropagation(); }
         actionFn();
     };
 
-    // STARTボタン設定
-    const sBtn = document.getElementById('start-btn-trigger');
-    const rBtn = document.getElementById('retry-btn-trigger');
-    sBtn.addEventListener('pointerdown', (e) => handleAction(gameStart, e));
-    rBtn.addEventListener('pointerdown', (e) => handleAction(gameStart, e));
+    document.getElementById('start-btn-trigger').addEventListener('pointerdown', (e) => handleAction(gameStart, e));
+    document.getElementById('retry-btn-trigger').addEventListener('pointerdown', (e) => handleAction(gameStart, e));
 
-    // コントローラー設定
     const btns = [
         {id:'ctrl-left', act:() => {player.pos.x--; if(collide(arena,player)) player.pos.x++;}},
         {id:'ctrl-right', act:() => {player.pos.x++; if(collide(arena,player)) player.pos.x--;}},
@@ -254,8 +259,7 @@
     ];
 
     btns.forEach(b => {
-        const el = document.getElementById(b.id);
-        el.addEventListener('pointerdown', (e) => handleAction(b.act, e));
+        document.getElementById(b.id).addEventListener('pointerdown', (e) => handleAction(b.act, e));
     });
 
     document.addEventListener('keydown', e => {
